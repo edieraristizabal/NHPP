@@ -52,6 +52,8 @@ if (!requireNamespace("gridExtra", quietly = TRUE)) install.packages("gridExtra"
 if (!requireNamespace("viridis",  quietly = TRUE)) install.packages("viridis")
 if (!requireNamespace("scales",   quietly = TRUE)) install.packages("scales")
 if (!requireNamespace("pROC",     quietly = TRUE)) install.packages("pROC")
+if (!requireNamespace("ggspatial",  quietly = TRUE)) install.packages("ggspatial")
+if (!requireNamespace("ggnewscale", quietly = TRUE)) install.packages("ggnewscale")
 
 library(INLA)
 library(inlabru)
@@ -62,6 +64,8 @@ library(gridExtra)
 library(grid)
 library(viridis)
 library(scales)
+library(ggspatial)
+library(ggnewscale)
 
 # ─── 1. RUTAS ──────────────────────────────────────────────────────────────────
 # El script se ejecuta desde CODE/; las rutas son relativas al directorio padre
@@ -137,6 +141,45 @@ domain_final <- st_sf(geometry = st_union(st_geometry(domain_final)), crs = 9377
 
 cat("Área del dominio:", round(as.numeric(st_area(domain_final)) / 1e6, 2), "km²\n")
 
+# ─── HILLSHADE Y HELPERS PARA MAPAS ──────────────────────────────────────────
+# Hillshade multidireccional: combina 4 ángulos de sol para un relieve más realista.
+# Un solo ángulo produce sombras planas; la combinación enfatiza crestas/valles
+# desde múltiples direcciones, similar a la representación de terreno en cartografía.
+slope_r  <- terrain(cov_elev, "slope",  unit = "radians")
+aspect_r <- terrain(cov_elev, "aspect", unit = "radians")
+
+hs_nw  <- shade(slope_r, aspect_r, angle = 45, direction = 315, normalize = TRUE)  # NO
+hs_ne  <- shade(slope_r, aspect_r, angle = 30, direction =  45, normalize = TRUE)  # NE
+hs_sw  <- shade(slope_r, aspect_r, angle = 30, direction = 225, normalize = TRUE)  # SO
+hs_se  <- shade(slope_r, aspect_r, angle = 30, direction = 135, normalize = TRUE)  # SE
+
+# Combinación ponderada: dirección principal NO (peso 2) + tres secundarias
+hs_r   <- (hs_nw * 2 + hs_ne + hs_sw + hs_se) / 5
+
+hs_wgs <- project(hs_r, "EPSG:4326")
+hs_df  <- as.data.frame(hs_wgs, xy = TRUE)
+names(hs_df)[3] <- "hillshade"
+
+# Capa de hillshade reutilizable
+hs_lyr <- function(alpha = 0.38) {
+  geom_raster(data = hs_df, aes(x = x, y = y, fill = hillshade),
+              inherit.aes = FALSE, alpha = alpha, interpolate = TRUE)
+}
+hs_scale <- function() {
+  scale_fill_gradientn(colors = grey.colors(256, start = 0.0, end = 1.0),
+                       guide = "none")
+}
+map_crs <- function() coord_sf(crs = sf::st_crs(4326), expand = FALSE)
+map_cart <- function(loc_s = "br", loc_n = "tr") {
+  list(
+    annotation_scale(location = loc_s, width_hint = 0.25,
+                     style = "ticks", line_width = 0.8, text_cex = 0.65),
+    annotation_north_arrow(location = loc_n, which_north = "true",
+      style = north_arrow_fancy_orienteering(text_size = 7),
+      height = unit(1.2, "cm"), width = unit(1.2, "cm"))
+  )
+}
+
 
 # ─── 4. MALLA SPDE ───────────────────────────────────────────────────────────
 #
@@ -149,13 +192,29 @@ cat("Área del dominio:", round(as.numeric(st_area(domain_final)) / 1e6, 2), "km
 #
 # Con datos en metros y extensión ~24km, usamos max.edge = c(1000, 3000) m
 
+# Figura 0: Mapa del inventario de deslizamientos de masa
+png(file.path(FIG, "00_inventario_deslizamientos.png"), width = 2400, height = 2400, res = 300)
+ggplot() +
+  hs_lyr(0.28) + hs_scale() +
+  geom_sf(data = domain_final, fill = NA, color = "black", lwd = 0.5) +
+  geom_sf(data = pts, size = 0.7, color = "#d62728", alpha = 0.7, shape = 21,
+          fill = "#d62728", stroke = 0.1) +
+  map_crs() +
+  map_cart() +
+  labs(x = "Longitud", y = "Latitud") +
+  theme_bw(base_size = 10) +
+  theme(axis.text  = element_text(size = 7),
+        axis.title = element_text(size = 8))
+dev.off()
+cat("✓ Fig 00: inventario\n")
+
 bnd <- fmesher::fm_as_segm(domain_final)
 
 mesh <- fmesher::fm_mesh_2d(
   boundary = bnd,
-  max.edge = c(1000, 3000),   # aristas interiores ≤1km, exteriores ≤3km
-  offset   = c(1000, 5000),   # margen 1km interior, 5km exterior
-  cutoff   = 300,             # mínima distancia entre nodos = 300m
+  max.edge = c(2000, 5000),   # aristas interiores ≤2km, exteriores ≤5km
+  offset   = c(2000, 6000),   # margen 2km interior, 6km exterior
+  cutoff   = 1000,            # mínima distancia entre nodos = 1km
   crs      = sf::st_crs(9377) # CRS requerido por inlabru 2.10+ para lgcp()
 )
 
@@ -179,16 +238,18 @@ mesh_tris <- st_sf(
 
 png(file.path(FIG, "01_mesh_spde.png"), width = 2400, height = 2000, res = 300)
 ggplot() +
+  hs_lyr(0.22) + hs_scale() +
   geom_sf(data = mesh_tris, fill = NA, color = "steelblue", lwd = 0.3, alpha = 0.4) +
-  geom_sf(data = pts, size = 0.8, color = "#d62728", alpha = 0.6) +
+  geom_sf(data = pts, size = 0.7, color = "#d62728", alpha = 0.6) +
   geom_sf(data = domain_final, fill = NA, color = "black", lwd = 0.6) +
-  labs(title = "Malla SPDE para el Campo Aleatorio Gaussiano",
-       subtitle = paste0("n_nodos = ", mesh$n,
-                         "  |  n_triángulos = ", nrow(mesh$graph$tv),
-                         "  |  max.edge = 1000 m"),
-       caption = "Rojo: deslizamientos observados  |  Azul: triangulación SPDE") +
+  map_crs() +
+  map_cart() +
+  labs(x = "Longitud", y = "Latitud",
+       caption = paste0("Rojo: deslizamientos observados  |  Azul: triangulación SPDE  |  Nodos: ",
+                        mesh$n, "  Triángulos: ", nrow(mesh$graph$tv))) +
   theme_bw(base_size = 10) +
-  theme(plot.title = element_text(face = "bold"))
+  theme(axis.text  = element_text(size = 7),
+        plot.caption = element_text(size = 7))
 dev.off()
 cat("✓ Fig 01: malla SPDE\n")
 
@@ -216,9 +277,9 @@ cat("✓ Fig 01: malla SPDE\n")
 
 spde <- inla.spde2.pcmatern(
   mesh  = mesh,
-  alpha = 2,                        # suavidad Matérn: ν = α - d/2 = 1
-  prior.range = c(2000, 0.5),       # P(rango < 2km) = 0.5
-  prior.sigma = c(2.0,  0.1)        # P(σ > 2)       = 0.1
+  alpha = 2,
+  prior.range = c(5000, 0.01),  # P(ρ < 5km) = 0.01
+  prior.sigma = c(2.0,  0.05)   # P(σ > 2)   = 0.05
 )
 
 cat("SPDE definido (Matérn, α=2, PC priors)\n")
@@ -266,23 +327,38 @@ cat("Covariables escaladas (media=0, sd=1)\n")
 # Si inlabru evalúa el raster en esos nodos y recibe NA, los trata como 0,
 # sesgando los coeficientes. Se propagan los valores de los vecinos más cercanos
 # mediante focal iterativo hasta eliminar todos los NAs.
-cat("Rellenando NAs en covariables (propagación vecinal)...\n")
+cat("Extendiendo y rellenando NAs en covariables...\n")
 fill_na_focal <- function(r) {
   filled <- r
   iter   <- 0
-  while (any(is.na(values(filled, na.rm = FALSE))) && iter < 50) {
+  while (any(is.na(values(filled, na.rm = FALSE))) && iter < 100) {
     filled <- terra::focal(filled, w = 3, fun = mean,
                            na.policy = "only", na.rm = TRUE)
     iter <- iter + 1
   }
   filled
 }
-cov_sc_filled <- terra::rast(lapply(names(cov_sc), function(nm) {
-  fill_na_focal(cov_sc[[nm]])
+
+# Extender el extent del raster para cubrir TODOS los nodos de la malla,
+# incluidos los del buffer exterior que caen fuera del DEM.
+# Sin esto, terra::extract devuelve NA en esos nodos y el modelo colapsa.
+mesh_ext <- terra::ext(
+  min(mesh$loc[, 1]) - 500,
+  max(mesh$loc[, 1]) + 500,
+  min(mesh$loc[, 2]) - 500,
+  max(mesh$loc[, 2]) + 500
+)
+cov_sc_ext <- terra::extend(cov_sc, mesh_ext)  # añade celdas NA en el margen
+
+cov_sc_filled <- terra::rast(lapply(names(cov_sc_ext), function(nm) {
+  fill_na_focal(cov_sc_ext[[nm]])
 }))
 names(cov_sc_filled) <- names(cov_sc)
-cat("  NAs restantes tras relleno:",
-    sum(is.na(values(cov_sc_filled, na.rm = FALSE))), "\n")
+
+# Verificar: ningún nodo debe quedar con NA
+vals_check <- terra::extract(cov_sc_filled[["slope_sc"]], mesh$loc[, 1:2])[, 1]
+cat("  NAs en nodos de la malla tras relleno:", sum(is.na(vals_check)),
+    "de", length(vals_check), "\n")
 
 # ── Pre-extracción de covariables en los puntos de deslizamiento ──────────────
 pts$slope_sc  <- terra::extract(cov_sc_filled[["slope_sc"]],  pts_coords)[, 1]
@@ -351,8 +427,19 @@ fit <- lgcp(
   samplers   = domain_final,
   domain     = list(geometry = mesh),
   options    = list(
+    control.fixed = list(
+      mean = 0, prec = 0.01  # prior Normal(0, σ=10) en cada β
+    ),
+    control.mode = list(
+      # Valores iniciales físicamente razonables para los hiperparámetros del GRF.
+      # Evita que el optimizador converja al mínimo degenerado (ρ→0, σ²→∞).
+      # theta[1] = log(rango_interno) ≈ log(5000) = 8.52
+      # theta[2] = log(sigma_interno) ≈ log(1.5)  = 0.41
+      theta   = c(8.52, 0.41),
+      restart = FALSE
+    ),
     control.inla = list(
-      int.strategy = "eb",   # Empirical Bayes para hiperparámetros (más rápido)
+      int.strategy = "ccd",    # integra sobre grilla de hiperparámetros (evita mínimos locales)
       strategy     = "laplace"
     ),
     verbose = TRUE
@@ -396,9 +483,7 @@ ggplot(coef_df[-1,], aes(x = variable, y = mean, color = sig)) +
                                 "Negativo (sig.)" = "#e31a1c",
                                 "No significativo" = "#636363"),
                      name = "Efecto") +
-  labs(title = "Efectos fijos del LGCP — Escala log-intensidad",
-       subtitle = "Medias posteriores con intervalos de credibilidad al 95%\nCovariables estandarizadas (β interpretable como cambio por 1 DE)",
-       x = NULL, y = expression(hat(beta) ~ "(log-intensidad)")) +
+  labs(x = NULL, y = expression(hat(beta) ~ "(log-intensidad)")) +
   theme_bw(base_size = 10) +
   theme(plot.title = element_text(face = "bold"),
         legend.position = "bottom")
@@ -448,22 +533,18 @@ p_range <- ggplot(pdf_range, aes(x, y)) +
   geom_area(fill = "#3182bd", alpha = 0.4) +
   geom_line(color = "#3182bd", lwd = 1) +
   geom_vline(xintercept = range_stats$mean/1000, lty=2, color="red") +
-  labs(title = "Rango espacial ρ", x = "ρ (km)", y = "Densidad posterior") +
+  labs(x = "ρ (km)", y = "Densidad posterior") +
   theme_bw(base_size = 10)
 
 p_sigma <- ggplot(pdf_sigma, aes(x, y)) +
   geom_area(fill = "#e6550d", alpha = 0.4) +
   geom_line(color = "#e6550d", lwd = 1) +
   geom_vline(xintercept = sigma_stats$mean, lty=2, color="red") +
-  labs(title = "Varianza marginal σ²", x = "σ²", y = "Densidad posterior") +
+  labs(x = expression(sigma^2), y = "Densidad posterior") +
   theme_bw(base_size = 10)
 
 png(file.path(FIG, "03_hiperparametros_spde.png"), width=2400, height=1200, res=300)
-gridExtra::grid.arrange(p_range, p_sigma, ncol = 2,
-  top = grid::textGrob(
-    "Distribuciones posteriores de los hiperparámetros del GRF (SPDE)",
-    gp = grid::gpar(fontsize = 13, fontface = "bold")
-  ))
+gridExtra::grid.arrange(p_range, p_sigma, ncol = 2)
 dev.off()
 cat("✓ Fig 03: hiperparámetros SPDE\n")
 
@@ -536,8 +617,6 @@ grid_pred$field_sd   <- pred_field$sd
 map_theme <- function() {
   theme_bw(base_size = 9) +
   theme(
-    plot.title    = element_text(face = "bold", size = 10),
-    plot.subtitle = element_text(size = 8),
     legend.key.height = unit(0.8, "cm"),
     axis.text  = element_text(size = 7),
     axis.title = element_text(size = 8)
@@ -545,37 +624,37 @@ map_theme <- function() {
 }
 
 # Figura 4: Intensidad predicha (media posterior)
-p_lambda <- ggplot(grid_pred) +
-  geom_sf(aes(color = lambda_mean), size = 0.4, shape = 15) +
+p_lambda <- ggplot() +
+  hs_lyr(0.22) + hs_scale() +
+  geom_sf(data = grid_pred, aes(color = lambda_mean), size = 0.4, shape = 15) +
   scale_color_viridis_c(option = "plasma", name = "λ(s)\n(eventos/m²)",
                         trans = "log10", labels = scientific) +
-  geom_sf(data = pts, size = 0.5, color = "white", alpha = 0.5) +
-  labs(title = "Intensidad predicha — Media posterior E[λ(s)|y]",
-       subtitle = "Blanco: deslizamientos observados  |  Escala log",
-       x = "Easting (m)", y = "Northing (m)") +
+  geom_sf(data = pts, size = 0.4, color = "white", alpha = 0.4) +
+  map_crs() + map_cart() +
+  labs(x = "Longitud", y = "Latitud") +
   map_theme()
 
 # Figura 5: Incertidumbre (desviación estándar posterior)
-p_sd <- ggplot(grid_pred) +
-  geom_sf(aes(color = lambda_sd), size = 0.4, shape = 15) +
+p_sd <- ggplot() +
+  hs_lyr(0.22) + hs_scale() +
+  geom_sf(data = grid_pred, aes(color = lambda_sd), size = 0.4, shape = 15) +
   scale_color_viridis_c(option = "cividis", name = "sd[λ(s)|y]",
                         trans = "log10", labels = scientific) +
-  labs(title = "Incertidumbre — Desviación estándar posterior",
-       subtitle = "Zonas de alta incertidumbre: escasa información o extrapolación",
-       x = "Easting (m)", y = "Northing (m)") +
+  map_crs() + map_cart() +
+  labs(x = "Longitud", y = "Latitud") +
   map_theme()
 
 # Figura 6: Campo espacial latente (ξ(s))
 lim_field <- max(abs(grid_pred$field_mean), na.rm = TRUE)
-p_field <- ggplot(grid_pred) +
-  geom_sf(aes(color = field_mean), size = 0.4, shape = 15) +
+p_field <- ggplot() +
+  hs_lyr(0.22) + hs_scale() +
+  geom_sf(data = grid_pred, aes(color = field_mean), size = 0.4, shape = 15) +
   scale_color_gradient2(low = "#2166ac", mid = "white", high = "#d73027",
                         midpoint = 0, limits = c(-lim_field, lim_field),
                         name = "ξ(s)") +
-  geom_sf(data = pts, size = 0.5, color = "black", alpha = 0.4) +
-  labs(title = "Campo espacial latente ξ(s) — Media posterior",
-       subtitle = "Azul: menos eventos de lo esperado  |  Rojo: más eventos de lo esperado",
-       x = "Easting (m)", y = "Northing (m)") +
+  geom_sf(data = pts, size = 0.4, color = "black", alpha = 0.3) +
+  map_crs() + map_cart() +
+  labs(x = "Longitud", y = "Latitud") +
   map_theme()
 
 png(file.path(FIG, "04_mapa_intensidad_predicha.png"), width=2400, height=2000, res=300)
@@ -595,11 +674,7 @@ cat("✓ Fig 06: campo latente ξ(s)\n")
 
 # Figura 7: Panel 3×1 — comparación espacial completa
 png(file.path(FIG, "07_panel_mapas.png"), width=4800, height=2000, res=300)
-gridExtra::grid.arrange(p_lambda, p_field, p_sd, ncol = 3,
-  top = grid::textGrob(
-    "LGCP — Intensidad, campo latente e incertidumbre | Valle de Aburrá",
-    gp = grid::gpar(fontsize = 13, fontface = "bold")
-  ))
+gridExtra::grid.arrange(p_lambda, p_field, p_sd, ncol = 3)
 dev.off()
 cat("✓ Fig 07: panel de mapas\n")
 
@@ -654,10 +729,8 @@ ggplot(hex_compare, aes(x = n_exp, y = n_obs)) +
   scale_x_continuous(limits = c(0, max_n)) +
   scale_y_continuous(limits = c(0, max_n)) +
   labs(
-    title    = "Ajuste del modelo: observado vs predicho",
-    subtitle = "Cada punto = hexcelda de 500m  |  Diagonal roja = ajuste perfecto",
-    x        = "Conteo esperado bajo el modelo E[N(A)|y]",
-    y        = "Conteo observado N(A)"
+    x = "Conteo esperado bajo el modelo E[N(A)|y]",
+    y = "Conteo observado N(A)"
   ) +
   annotate("text", x = max_n*0.7, y = max_n*0.1,
            label = paste0("r² = ", round(cor(hex_compare$n_obs,
@@ -671,37 +744,40 @@ cat("✓ Fig 08: observado vs predicho\n")
 # Figura 9: Mapa de residuos de Pearson
 png(file.path(FIG, "09_mapa_residuos.png"), width=2400, height=2000, res=300)
 lim_res <- quantile(abs(hex_compare$pearson_res), 0.99, na.rm=TRUE)
-ggplot(hex_compare) +
-  geom_sf(aes(fill = pearson_res), color = NA) +
+ggplot() +
+  hs_lyr(0.22) + hs_scale() +
+  ggnewscale::new_scale_fill() +
+  geom_sf(data = hex_compare, aes(fill = pearson_res), color = NA, alpha = 0.80) +
   scale_fill_gradient2(low="#2166ac", mid="white", high="#d73027",
                        midpoint=0, limits=c(-lim_res, lim_res),
                        name="Residuo\nPearson", na.value="gray90") +
-  geom_sf(data=pts, size=0.4, color="black", alpha=0.4) +
-  labs(title="Residuos de Pearson — Ajuste espacial del modelo",
-       subtitle="Rojo: más eventos de lo predicho  |  Azul: menos eventos de lo predicho",
-       x="Easting (m)", y="Northing (m)") +
+  geom_sf(data=pts, size=0.4, color="black", alpha=0.3) +
+  map_crs() + map_cart() +
+  labs(x = "Longitud", y = "Latitud") +
   map_theme()
 dev.off()
 cat("✓ Fig 09: mapa de residuos\n")
 
 # Figura 10: Mapa de conteo observado vs esperado (doble panel)
-p_obs <- ggplot(hex_compare) +
-  geom_sf(aes(fill = n_obs), color = NA) +
+p_obs <- ggplot() +
+  hs_lyr(0.22) + hs_scale() +
+  ggnewscale::new_scale_fill() +
+  geom_sf(data = hex_compare, aes(fill = n_obs), color = NA, alpha = 0.80) +
   scale_fill_viridis_c(option="plasma", name="N observado") +
-  geom_sf(data=pts, size=0.3, color="white", alpha=0.5) +
-  labs(title="Observado", x=NULL, y=NULL) + map_theme()
+  geom_sf(data=pts, size=0.3, color="white", alpha=0.4) +
+  map_crs() + map_cart(loc_s="bl", loc_n="tl") +
+  labs(x = "Longitud", y = "Latitud") + map_theme()
 
-p_exp <- ggplot(hex_compare) +
-  geom_sf(aes(fill = n_exp), color = NA) +
+p_exp <- ggplot() +
+  hs_lyr(0.22) + hs_scale() +
+  ggnewscale::new_scale_fill() +
+  geom_sf(data = hex_compare, aes(fill = n_exp), color = NA, alpha = 0.80) +
   scale_fill_viridis_c(option="plasma", name="N esperado") +
-  labs(title="Predicho por el modelo", x=NULL, y=NULL) + map_theme()
+  map_crs() + map_cart() +
+  labs(x = "Longitud", y = "Latitud") + map_theme()
 
 png(file.path(FIG, "10_obs_vs_predicho_mapas.png"), width=4000, height=2000, res=300)
-gridExtra::grid.arrange(p_obs, p_exp, ncol = 2,
-  top = grid::textGrob(
-    "Comparación espacial: conteo observado vs esperado bajo el LGCP",
-    gp = grid::gpar(fontsize = 13, fontface = "bold")
-  ))
+gridExtra::grid.arrange(p_obs, p_exp, ncol = 2)
 dev.off()
 cat("✓ Fig 10: mapas comparativos\n")
 
@@ -733,23 +809,15 @@ png(file.path(FIG, "11_diagnostico_cpo.png"), width=2400, height=1600, res=300)
 cpo_df <- data.frame(cpo = fit$cpo$cpo, pit = fit$cpo$pit)
 p_cpo <- ggplot(cpo_df, aes(x=log(cpo))) +
   geom_histogram(fill="#3182bd", color="white", bins=40) +
-  labs(title="Distribución del log(CPO)",
-       subtitle="CPO pequeño → punto mal predicho o influyente",
-       x="log(CPO)", y="Frecuencia") +
+  labs(x="log(CPO)", y="Frecuencia") +
   theme_bw(base_size=10)
 
 p_pit <- ggplot(cpo_df, aes(x=pit)) +
   geom_histogram(fill="#e6550d", color="white", bins=20, boundary=0) +
   geom_hline(yintercept=nrow(pts)/20, lty=2, color="gray50") +
-  labs(title="PIT — Probability Integral Transform",
-       subtitle="Distribución uniforme → modelo bien calibrado",
-       x="PIT", y="Frecuencia") +
+  labs(x="PIT", y="Frecuencia") +
   theme_bw(base_size=10)
-gridExtra::grid.arrange(p_cpo, p_pit, ncol = 2,
-  top = grid::textGrob(
-    "Diagnóstico del modelo — CPO y PIT",
-    gp = grid::gpar(fontsize = 13, fontface = "bold")
-  ))
+gridExtra::grid.arrange(p_cpo, p_pit, ncol = 2)
 dev.off()
 cat("✓ Fig 11: diagnóstico CPO/PIT\n")
 
@@ -761,9 +829,8 @@ roc_obj  <- roc(as.numeric(roc_data$n_obs > 0), roc_data$n_exp)
 auc_val  <- auc(roc_obj)
 
 png(file.path(FIG, "12_curva_roc.png"), width=1800, height=1800, res=300)
-plot(roc_obj, col="#3182bd", lwd=2,
-     main=paste0("Curva ROC — AUC = ", round(auc_val, 3)),
-     sub="Discriminación: celdas con/sin deslizamiento vs intensidad predicha")
+plot(roc_obj, col="#3182bd", lwd=2)
+text(0.3, 0.1, paste0("AUC = ", round(auc_val, 3)), cex=1.2, col="#3182bd")
 abline(0, 1, lty=2, col="gray")
 dev.off()
 cat("✓ Fig 12: curva ROC  AUC =", round(auc_val, 3), "\n")

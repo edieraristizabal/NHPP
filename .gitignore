@@ -86,3 +86,35 @@ $RECYCLE.BIN/
 *.bak
 *.orig
 nohup.out
+
+# ─── LATEX: artefactos de compilación ────────────────────────────────────────
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.synctex(busy)
+# Descomentar la siguiente línea si no se quiere versionar el PDF compilado:
+# *.pdf
+
+# ─── SCRIPTS DE DIAGNÓSTICO Y CONFIGURACIÓN (intermedios, no son el modelo) ──
+CODE/check_extent.R
+CODE/check_extent.bat
+CODE/check_nodes_covs.R
+CODE/check_nodes_covs.bat
+CODE/check_pkgs.R
+CODE/check_pkgs.bat
+CODE/check_rasters.R
+CODE/check_rasters.bat
+CODE/diag_confounding.R
+CODE/diag_confounding.bat
+CODE/diag_covs.R
+CODE/diag_covs.bat
+CODE/install_inla.R
+CODE/install_inla.bat
+CODE/mesh_stats.R
+CODE/mesh_stats.bat
+setup_github.bat
+setup_github.sh
