@@ -519,13 +519,13 @@ p_lambda <- ggplot() +
 png(file.path(FIG,"2m_04_intensidad.png"), width=2400, height=2000, res=300)
 print(p_lambda); dev.off(); cat("  ✓ 2m_04: intensidad\n")
 
-# Incertidumbre — paleta verde (bajo) → rojo (alto)
+# Incertidumbre — paleta magma (violeta → amarillo), diferente de la intensidad
 p_sd <- ggplot() +
   hs_lyr(1.0) + hs_scale() + ggnewscale::new_scale_fill() +
   geom_raster(data=sd_rdf, aes(x=x, y=y, fill=value),
               alpha=0.35, interpolate=TRUE) +
-  scale_fill_gradientn(
-    colors = c("#1a9641","#a6d96a","#ffffbf","#fdae61","#d7191c"),
+  scale_fill_viridis_c(
+    option = "magma",
     name   = "sd[λ|y]",
     trans  = "log10", labels = scales::scientific) +
   map_crs() + map_cart() +

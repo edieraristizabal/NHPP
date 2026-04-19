@@ -80,19 +80,61 @@ puntual espacial; Proceso de Poisson No Homogéneo; Medellín.
 La modelación de la susceptibilidad por movimientos en masa ha
 evolucionado desde métodos heurísticos basados en criterios de expertos hasta
 modelos estadísticos y de aprendizaje automático, donde la regresión logística
-el enfoque más difundido \citep{reichenbach2018}. La mayoría de estos métodos
+es el enfoque más utilizado \citep{reichenbach2018}. La mayoría de estos métodos
 estadísticos proyectan el inventario de eventos sobre una cuadrícula regular de celdas, asignan
 etiquetas binarias de presencia-ausencia de movimientos en masa y modelan la probabilidad de ocurrencia en
 función de atributos como la pendiente, la curvatura, la litología o el
 uso del suelo, entre otros \citep{guzzetti2005, lombardo2018}. Aunque operativamente conveniente,
 esta discretización conlleva pérdidas de información espacial importantes y confunde
-la ausencia verdadera de ocurrencia con la falta de observación o registro en el
+la ausencia verdadera de ocurrencia de movimientos en masa con la falta de observación o registro en el
 inventario, lo que sesga la evaluación de la susceptibilidad
-\citep{lombardo2018, parra2019}.
+\citep{lombardo2018}.
 
-En las últimas décadas, los modelos de aprendizaje automático ---bosques aleatorios, redes neuronales profundas, máquinas de vectores de soporte y sus variantes de ensamble--- han alcanzado niveles de desempeño predictivo excepcionalmente altos en la evaluación de la susceptibilidad por movimientos en masa, con valores de AUC que frecuentemente superan 0,90 en conjuntos de validación \citep{reichenbach2018}. Sin embargo, estos modelos operan esencialmente como \emph{cajas negras}: su arquitectura interna impide la interpretación directa de las relaciones entre covariables y respuesta en términos del proceso físico subyacente, dificultando la validación científica de los resultados y la transferencia del conocimiento entre contextos geomorfológicos \citep{lombardo2018}. Esta limitación es particularmente relevante en el ámbito de los movimientos en masa, donde la identificación cuantitativa de los factores de control ---topografía, litología, uso del suelo--- tiene implicaciones directas para la gestión del riesgo y el diseño de medidas de reducción de la amenaza. Los modelos de la familia de los Modelos Lineales Generalizados (GLM), en cambio, vinculan cada predictor a la respuesta mediante coeficientes interpretables que cuantifican el efecto de cada variable controlando el resto, permitiendo conectar los resultados estadísticos con el conocimiento geomorfológico del proceso e incorporar, bajo un marco bayesiano, información \emph{a priori} físicamente fundamentada con cuantificación explícita de la incertidumbre en todas las estimaciones. En particular, el GLM de Poisson con función de enlace logarítmica modela el número esperado de eventos en cada unidad espacial como función log-lineal de las covariables, lo que constituye la forma discreta de un mecanismo generador más fundamental: cuando el inventario se concibe no como conteos en celdas arbitrarias sino como una nube de puntos en el espacio continuo, esta misma estructura conduce de manera natural al marco de los \emph{procesos puntuales espaciales}.
+En las últimas décadas, los modelos de aprendizaje automático ---bosques aleatorios, 
+redes neuronales profundas, máquinas de vectores de soporte y sus variantes de 
+ensamble--- han alcanzado niveles de desempeño predictivo excepcionalmente altos 
+en la evaluación de la susceptibilidad por movimientos en masa, con valores de Área Bajo la Curva (AUC [0-1]) 
+que frecuentemente superan 0,90 en conjuntos de validación \citep{reichenbach2018}. 
+Sin embargo, estos modelos operan esencialmente como \emph{cajas negras}: 
+su arquitectura interna impide la interpretación directa de las relaciones entre 
+covariables y respuesta en términos del proceso físico subyacente, dificultando 
+la validación científica de los resultados y la transferencia del conocimiento 
+entre contextos geomorfológicos \citep{lombardo2018}. Esta limitación es 
+particularmente relevante en el ámbito de los movimientos en masa, donde 
+la identificación cuantitativa de los factores de control ---topografía, 
+litología, uso del suelo--- tiene implicaciones directas para la gestión 
+del riesgo y el diseño de medidas de reducción de la amenaza. 
 
-Desde esta perspectiva, el inventario de movimientos en masa es mejor
+Los modelos 
+de la familia de los Modelos Lineales Generalizados (GLM), en cambio, vinculan 
+cada predictor a la respuesta mediante coeficientes interpretables que cuantifican 
+el efecto de cada variable controlando el resto, permitiendo conectar los resultados
+ estadísticos con el conocimiento geomorfológico del proceso e incorporar, bajo un
+  marco bayesiano, información \emph{a priori} físicamente fundamentada con 
+  cuantificación explícita de la incertidumbre en todas las estimaciones. En 
+  particular, el GLM de Poisson modela el
+  número esperado de eventos en cada unidad espacial de análisis (celda, unida de ladera, cuenca, etc.) como función log-lineal
+  de las covariables, lo que constituye la forma discreta, denominada
+  \emph{modelo espacial de área}, de un mecanismo
+  generador más fundamental. En el modelo de área, la intensidad es constante
+  dentro de cada polígono y el logaritmo del área se incluye como \emph{offset}
+  en el predictor lineal para modelar tasas de ocurrencia independientemente
+  del tamaño de la unidad; la autocorrelación espacial entre unidades contiguas
+  puede incorporarse mediante componentes autorregresivos condicionales (CAR)
+  \citep{besag1974, besag1991},
+  dando lugar a modelos lineales generalizados jerárquicos de Poisson con
+  estructura espacial. Este paradigma opera en el espacio discreto: la
+  susceptibilidad se expresa como función constante por partes que cambia
+  abruptamente en los límites de los polígonos, y los resultados pueden depender
+  del tamaño y la forma de las unidades elegidas, el Problema de la Unidad de
+  Área Modificable \citep[MAUP;][]{openshaw1984, fotheringham1991}.
+  
+  Cuando, en cambio, el inventario se concibe como
+  una nube de puntos en el espacio continuo $\mathbb{R}^2$, esta misma estructura
+  conduce de manera natural al marco de los \emph{procesos puntuales espaciales},
+  donde la función de intensidad $\lambda(\mathbf{s})$ varía de forma continua
+  y suave en todo el dominio sin imponer unidades de agregación predefinidas. 
+  Desde esta perspectiva, el inventario de movimientos en masa es mejor
 entendido como una realización de un conjunto aleatorio de puntos en el
 dominio continuo $\Omega \subset \mathbb{R}^2$, y la inferencia estadística
 apunta a la función de intensidad espacialmente variable $\lambda(\mathbf{s})$
@@ -100,7 +142,7 @@ que gobierna el número esperado de eventos por unidad de área
 \citep{diggle2013}. El modelo más parsimonioso de esta familia es el
 \emph{Proceso de Poisson No Homogéneo} (NHPP): los eventos son
 condicionalmente independientes dado $\lambda(\mathbf{s})$, y esta intensidad
-se modela como función log-lineal de las covariables espaciales ---la misma
+se modela como función log-lineal de las covariables espaciales, la misma
 estructura del GLM de Poisson, pero formulada en el dominio continuo sin
 necesidad de imponer una cuadrícula. Este enfoque evita la discretización
 arbitraria en celdas, suprime la ambigüedad de las ausencias (celdas sin movimientos en masa) y
@@ -110,9 +152,13 @@ como densidad esperada de eventos por unidad de área.
 La aplicación del proceso puntual espacial a los movimientos en masa sigue siendo
 escasa en la literatura. \citet{lombardo2019} demostraron el enfoque para flujos de
 detritos en Sicilia, y \citet{lombardo2020} lo extendieron a contextos
-espacio-temporales. En el contexto andino, no se conocen trabajos que hayan implementado
-esta metodología. En este trabajo se implementa un modelo NHPP para los movimientos en masa 
-en la ciudad de Medellín, Colombia, con dos predictores topográficos y considerando la cobertura urbana/rural y los materiales que conforman las laderas como suelos gruesos o finos.
+espacio-temporales. En el contexto andino, \citet{aristizabal2025ag} han aplicado recientemente el
+modelo de Poisson espacial de área, con componente CAR sobre unidades de
+ladera, al departamento de Antioquia, Colombia; ese enfoque opera en el espacio
+discreto de los polígonos. En este trabajo se implementa un proceso puntual espacial en el
+dominio continuo, \emph{Proceso de Poisson No Homogéneo} (NHPP), para los movimientos en masa en la ciudad de Medellín,
+Colombia, con dos predictores topográficos y considerando la cobertura urbana/rural
+y los materiales que conforman las laderas como suelos gruesos o finos.
 
 % ─────────────────────────────────────────────────────────────
 \section{Área de estudio}
@@ -125,17 +171,17 @@ colombianos ($6^\circ6'$--$6^\circ41'$\,N, $75^\circ45'$--$75^\circ21'$\,O). La 
 característica de los Andes tropicales: las elevaciones oscilan entre aproximadamente
 1300\,m s.n.m. en el fondo del valle y más de 2600\,m en las crestas, con flancos
 empinados disectados por numerosas quebradas tributarias del río Medellín
-\citep{aristizabal2025, aristizabal2026}. Geomorfológicamente, el valle está modelado
+\citep{aristizabal2026}. Geomorfológicamente, el valle está modelado
 por la convergencia oblicua de las placas de Nazca y del Caribe con la placa
 Sudamericana \citep{trenkamp2002, cediel2003}, que genera un levantamiento activo,
 fallas y una topografía altamente montañosa que favorece intrínsecamente
-los procesos de remoción en masa \citep{aristizabal2026}. La región alberga más de
+los procesos de remoción en masa \citep{aristizabal2025}. La región alberga más de
 3.6 millones de habitantes, de los cuales el 95\,\% reside en áreas urbanas que
 ocupan aproximadamente \SI{340}{km^2}; su crecimiento demográfico fue 30 veces mayor
 entre 1905 y 2005 \citep{aristizabal2026}. Los movimientos en masa representan la
 amenaza natural más recurrente: causan tres de cada diez desastres reportados y el
 75\,\% de las víctimas anuales por eventos naturales en la región
-\citep{aristizabal2026}.
+\citep{gomez2023}.
 
 El clima es tropical bimodal, regulado principalmente por la migración meridional de
 la Zona de Convergencia Intertropical (ZCIT) \citep{bedoya2019, aristizabal2026, poveda2011}. Las
@@ -165,7 +211,7 @@ en rocas ultrabásicas y metamórficas, los perfiles son más delgados (10–20\
 color naranja-rojizo (Munsell 7.5YR\,7/6) y con abundantes fragmentos muy
 meteorizados \citep{aristizabal2005, aristizabal2025}. Los materiales de ladera están
 dominados por suelos residuales sobre roca profundamente meteorizada y por depósitos
-coluviales derivados de procesos de remoción en masa de largo plazo \citep{aristizabal2026}.
+coluviales derivados de procesos de remoción en masa de largo plazo \citep{aristizabal2005}.
 
 % ─────────────────────────────────────────────────────────────
 \section{Datos}
@@ -225,10 +271,6 @@ del ajuste del modelo.
     \bottomrule
   \end{tabular}
   \begin{minipage}{\linewidth}
-    \smallskip\footnotesize
-    \textit{Nota}: Estadísticas calculadas en los \num{2504} puntos de evento;
-    la pendiente mediana de $36{,}8^\circ$ refleja el dominio de laderas empinadas
-    donde se concentran los movimientos en masa.
   \end{minipage}
 \end{table}
 
@@ -253,28 +295,14 @@ dos clases binarias:
 \subsection{Proceso de Poisson No homogéneo (NHPP)}
 \label{sec:ipp}
 
-La modelación estadística tradicional
-de la susceptibilidad por movimientos en masa consiste en dividir el territorio en celdas, etiquetar cada
-celda como \emph{con deslizamiento} o \emph{sin deslizamiento} y construir un modelo que
-prediga cuáles celdas tienen mayor probabilidad de pertenecer a la clase de ocurrencia del evento.
-Este enfoque es útil, pero implica decisiones arbitrarias como el tamaño de las celdas o seleccionar las celdas sin deslizamientos para entrenar el modelo.
-
-El marco de \emph{proceso puntual espacial} evita estas decisiones al tratar cada
-deslizamiento como un evento puntual en el espacio. El objeto de interés no es
-la probabilidad de que una celda tenga deslizamiento, sino la \emph{intensidad}
-$\lambda(\mathbf{s})$: el número esperado de deslizamientos por unidad de área en
-la localización $\mathbf{s}$. Una intensidad alta en una zona indica que esa zona
-concentra muchos deslizamientos por km$^2$; una intensidad baja indica lo contrario.
-La intensidad es, por tanto, directamente proporcional a la susceptibilidad local.
-
-El NHPP establece que el número de deslizamientos en
-cualquier área $A \subset \Omega$ sigue una distribución de Poisson con media
-$\int_A \lambda(\mathbf{s})\,d\mathbf{s}$. El reto estadístico es estimar la
-función $\lambda(\mathbf{s})$ en todo el dominio a partir de las \num{2504}
-localizaciones observadas, teniendo en cuenta que la intensidad varía, en este caso, con la
-topografía, y el tipo de suelo y cobertura.
-
-El NHPP establece que los eventos son
+El inventario de movimientos en masa se
+trata como una realización de un proceso puntual espacial en el dominio continuo
+$\Omega \subset \mathbb{R}^2$, cuya distribución está gobernada por la función de
+intensidad $\lambda(\mathbf{s})$. El modelo adoptado es el Proceso de Poisson No
+Homogéneo (NHPP), en el que el reto estadístico es estimar $\lambda(\mathbf{s})$
+en todo el dominio a partir de las \num{2504} localizaciones observadas, teniendo en
+cuenta que la intensidad varía con la topografía, el tipo de suelo y la cobertura del
+territorio. Formalmente, el NHPP establece que los eventos son
 condicionalmente independientes dado la función de intensidad
 $\lambda(\mathbf{s})$, y el conteo en cualquier área $A$ sigue
 $N(A) \sim \text{Poisson}\!\left(\int_A \lambda(\mathbf{s})\,d\mathbf{s}\right)$.
@@ -296,15 +324,6 @@ topográficas estandarizadas (media 0, d.e. 1); $\text{geo\_finos} \in \{0,1\}$
 el indicador de suelos finos; y $\text{urb} \in \{0,1\}$ el indicador de
 cobertura urbanizada.
 
-Operacionalmente, el NHPP con predictor log-lineal es equivalente a una
-regresión Poisson discreta sobre una grilla suficientemente fina
-\citep{warton2010}. En este trabajo se utilizó la librería \texttt{inlabru} en R que 
-ofrece ventajas sobre la regresión en grilla: (i)~no requiere elegir una resolución de celda
-arbitraria; (ii)~la verosimilitud del proceso puntual continuo se integra
-correctamente mediante el dispositivo de Berman-Turner sobre la malla triangular;
-y (iii)~no demanda definir ausencias ni muestreo de \emph{background}, fuentes
-de sesgo comunes en modelos de susceptibilidad.
-
 Los coeficientes $\beta_j$ actúan sobre la \emph{log-intensidad}: $\beta_j > 0$
 implica mayor intensidad esperada al aumentar la covariable $j$. Un incremento
 de una desviación estándar en una covariable continua multiplica la intensidad
@@ -320,7 +339,7 @@ evaluación involucra la integral de la intensidad
 $\int_\Omega \lambda(\mathbf{s})\,d\mathbf{s}$ sobre el dominio continuo, que no
 tiene solución analítica cuando la intensidad varía en el espacio según covariables
 continuas; esta integral se aproxima numéricamente mediante el dispositivo de
-Berman-Turner sobre una malla triangular.
+Berman-Turner \citep{diggle2013} sobre una malla triangular.
 
 La estimación bayesiana completa de los parámetros requeriría en principio el
 muestreo por cadenas de Markov (MCMC), cuyas iteraciones resultan computacionalmente
@@ -331,10 +350,9 @@ tiempos razonables. Por ello, se adopta la \emph{Aproximación de Laplace Anidad
 Integrada} \citep[INLA;][]{rue2009, rue2017}, que computa las distribuciones
 marginales posteriores de todos los parámetros mediante aproximaciones analíticas
 de Laplace, sin simulación estocástica, con precisión comparable al MCMC y sin el costo computacional. INLA aplica la aproximación sobre el predictor
-lineal con integración numérica sobre una grilla de configuraciones (estrategia
-\texttt{ccd}), proporcionando una cuantificación robusta de la incertidumbre.
+lineal con integración numérica sobre una grilla de configuraciones, proporcionando una cuantificación robusta de la incertidumbre.
 
-La malla triangular construida con \texttt{fmesher} cubre tanto el
+La malla triangular cubre tanto el
 dominio interior como un buffer exterior de \SI{2}{km} (Figura~\ref{fig:mesh},
 Tabla~\ref{tab:mesh}). La malla es necesaria para aproximar numéricamente la
 integral $\int_\Omega \lambda(\mathbf{s})\,d\mathbf{s}$ de la Ec.~\eqref{eq:ipp1}
@@ -348,9 +366,7 @@ de borde.
 \begin{table}[H]
   \centering
   \caption{Parámetros de la malla triangular utilizada para la integración
-           numérica de la verosimilitud del NHPP (dispositivo de Berman-Turner).
-           La resolución interior de \SI{100}{m} es adecuada para covariables
-           a \SI{2}{m} de resolución.}
+           numérica de la verosimilitud del NHPP (dispositivo de Berman-Turner).}
   \label{tab:mesh}
   \begin{tabular}{lrr}
     \toprule
@@ -384,8 +400,7 @@ y como puntuación la intensidad total predicha.
 \label{sec:results}
 % ─────────────────────────────────────────────────────────────
 
-El inventario comprende \num{2504} movimientos en masa en \SI{335,21}{km^2},
-con una densidad media de 7,08 eventos km$^{-2}$. La distribución es marcadamente
+La distribución de movimientos en masa de acuerdo con el inventario es marcadamente
 no homogénea, con densidades locales que superan los 20 eventos km$^{-2}$ en
 los flancos de mayor pendiente del valle. La Figura~\ref{fig:inventario} muestra
 la distribución espacial de los eventos y la Figura~\ref{fig:mesh} la malla
@@ -403,8 +418,7 @@ de ladera.
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.75\linewidth]{FIG/2m_01_mesh.png}
-  \caption{Malla triangular superpuesta al hillshade del relieve del Valle
-           de Aburrá. Puntos rojos: zonas de iniciación de movimientos en masa
+  \caption{Malla triangular superpuesta al hillshade del relieve de Medellín. Puntos rojos: zonas de iniciación de movimientos en masa
            observados (\num{2504} eventos). Triangulación azul: malla de integración
            (\num{92657} nodos, \num{185024} triángulos). El buffer exterior (triángulos de mayor
            tamaño) se extiende \SI{2}{km} fuera del dominio de estudio (contorno
@@ -413,8 +427,7 @@ de ladera.
 \end{figure}
 
 La Tabla~\ref{tab:fixeff} y la Figura~\ref{fig:fixeff} presentan los coeficientes
-posteriores del modelo NHPP (Proceso de Poisson No Homogéneo con intensidad
-log-lineal, Ec.~\ref{eq:ipp}). La pendiente es el único predictor
+posteriores del modelo NHPP. La pendiente es el único predictor
 topográfico positivo y significativo; el aspecto muestra un efecto negativo
 significativo. Los dos predictores binarios (suelos finos y cobertura urbana) son
 negativos y significativos.
@@ -425,9 +438,7 @@ negativos y significativos.
            covariables estandarizadas). Los coeficientes indican el cambio en
            $\log\lambda(\mathbf{s})$ por incremento de una desviación estándar en
            cada covariable continua, o el efecto de pertenecer a la clase activa
-           para las variables binarias.
-           Ajuste con \texttt{int.strategy = ``ccd''}, estrategia \texttt{laplace}
-           y priors $\beta_j \sim \mathcal{N}(0,\,1)$.}
+           para las variables binarias.}
   \label{tab:fixeff}
   \begin{tabular}{lrrrr}
     \toprule
@@ -479,7 +490,7 @@ predicha significativamente menor que las zonas rurales una vez que se controla
 la topografía. Este resultado refleja que las zonas urbanas de Medellín
 se localizan predominantemente en el fondo plano del valle (baja pendiente)
 y que el indicador binario captura el efecto residual de la urbanización,
-que en pendientes bajas reduce la susceptibilidad respecto a laderas vegetadas.
+que en pendientes bajas reduce la susceptibilidad respecto a laderas rurales.
 
 Las Figuras~\ref{fig:maps} muestra la superficie de intensidad media posterior
 $\hat{\lambda}(\mathbf{s})$ y su incertidumbre en el dominio de estudio. Las
@@ -506,8 +517,8 @@ menor varianza predictiva.
   \end{subfigure}
   \caption{Mapas de (a) la intensidad media posterior $\hat{\lambda}(\mathbf{s})$
            (eventos m$^{-2}$) y (b) la desviación estándar posterior del modelo NHPP
-           en el Valle de Aburrá. Verde: baja susceptibilidad/incertidumbre;
-           rojo: alta susceptibilidad/incertidumbre.}
+           en el Valle de Aburrá. (a) Verde: baja susceptibilidad; rojo: alta
+           susceptibilidad (escala logarítmica). (b) De violeta a amarillo: baja a alta incertidumbre en la estimación de $\lambda(\mathbf{s})$.}
   \label{fig:maps}
 \end{figure}
 
@@ -525,8 +536,7 @@ factores antrópicos locales amplifican la susceptibilidad.
            del modelo NHPP sobre el Valle de Aburrá. Rojo: celdas con más eventos
            de los esperados (posible subestimación de la susceptibilidad local o
            subreporte en el inventario). Azul: celdas con menos eventos de los
-           esperados. La ausencia de patrones espaciales sistemáticos indica que
-           el modelo no presenta sesgo geográfico estructurado.}
+           esperados.}
   \label{fig:residuos}
 \end{figure}
 
@@ -551,10 +561,6 @@ con movimiento en masa por encima de una celda sin evento en aproximadamente el
     \bottomrule
   \end{tabular}
   \begin{minipage}{\linewidth}
-    \smallskip\footnotesize
-    El AUC fue calculado sobre una grilla hexagonal de $\approx 0{,}25\,\text{km}^2$
-    usando la intensidad posterior media del modelo NHPP (cuatro predictores: pendiente,
-    aspecto, suelos finos y cobertura urbana; MDE a \SI{2}{m}).
   \end{minipage}
 \end{table}
 
@@ -574,15 +580,52 @@ con movimiento en masa por encima de una celda sin evento en aproximadamente el
 \label{sec:discussion}
 % ─────────────────────────────────────────────────────────────
 
-Los coeficientes del modelo confirman que la topografía es el principal
+La susceptibilidad a los movimientos en masa puede modelarse mediante
+distribuciones de Poisson bajo dos paradigmas espaciales que conviene contrastar.
+El \emph{modelo de área} agrega los eventos en polígonos discretos ---celdas
+regulares, cuencas o unidades de ladera--- y modela el conteo $y_i$ en la unidad
+$i$ como $y_i \sim \text{Poisson}(\lambda_i\,A_i)$
+\citep{aristizabal2025ag}. Este enfoque fue aplicado recientemente en el contexto
+andino colombiano para el departamento de Antioquia, demostrando su utilidad a
+escala regional con unidades de ladera como unidad mínima de análisis
+\citep{aristizabal2025ag}. Sus ventajas son la eficiencia computacional, requiere
+únicamente una sumatoria sobre los polígonos y la interpretabilidad directa de los efectos
+aleatorios espaciales como variaciones regionales de la susceptibilidad no explicadas
+por los predictores fijos. La principal limitación es que la intensidad estimada es
+constante dentro de cada polígono independientemente de la variabilidad topográfica
+interna, y que los resultados dependen del tamaño y la forma de las unidades de
+análisis elegidas, lo que puede
+introducir discontinuidades artificiales en los límites de los polígonos.
+
+El proceso puntual espacial adoptado en este trabajo supera estas limitaciones
+estructurales. La función de intensidad $\lambda(\mathbf{s})$ varía de forma continua
+en cada coordenada del dominio, utilizando las covariables exactas en ese punto y
+produciendo una superficie de susceptibilidad suave sin discontinuidades en los
+límites de polígonos ni dependencia del tamaño de las unidades de análisis. En los
+Andes, donde la pendiente puede cambiar en distancias
+de pocos metros, esta propiedad es fundamental para representar fielmente la
+distribución espacial de la amenaza a escala de ladera. Además, el NHPP no requiere
+\emph{offset} de área, la integral $\int_A \lambda(\mathbf{s})\,d\mathbf{s}$ da
+directamente el número esperado de eventos en cualquier región $A$, ni demanda
+definir celdas sin deslizamientos. La contrapartida es un mayor
+costo computacional: la integral $\int_\Omega \lambda(\mathbf{s})\,d\mathbf{s}$ se
+evalúa numéricamente sobre una malla triangular (\num{92657} nodos en este trabajo)
+y la inferencia requiere la aproximación bayesiana INLA para ser factible en tiempos
+razonables. La elección entre ambos paradigmas depende de la escala de análisis y
+los objetivos del estudio: el modelo de área es adecuado a escalas regionales con
+unidades geográficas relativamente homogéneas, mientras que el proceso puntual es
+preferible cuando se dispone de inventarios de alta resolución y se requiere estimar
+la susceptibilidad con resolución métrica en terrenos topográficamente complejos.
+
+En cuanto a los resultados, los coeficientes del modelo confirman que la topografía es el principal
 determinante de la distribución espacial de los movimientos en masa en Medellín. El coeficiente de pendiente
-$\hat{\beta}_1 = 0{,}901$ es positivo, preciso y de gran magnitud,
+$\hat{\beta}_1 = 0{,}901$ es positivo y de gran magnitud,
 reflejando que la aceleración gravitacional tangencial es el determinante primario
 de la inestabilidad. Un incremento de una desviación estándar en pendiente
 multiplica la intensidad local por $e^{0{,}901} \approx 2{,}5$.
 
 El aspecto negativo ($\hat{\beta}_2 = -0{,}243$) indica mayor susceptibilidad
-en laderas de orientación norte, que reciben menos radiación solar directa,
+en laderas con un mayor dirección azimutal, que reciben menos radiación solar directa,
 mantienen mayor humedad del suelo durante los períodos de lluvia y desarrollan
 suelos potencialmente más profundos por menor evapotranspiración. Este efecto es
 independiente de la pendiente y la litología.
@@ -590,12 +633,11 @@ independiente de la pendiente y la litología.
 El índice topográfico de humedad (TWI, $\text{TWI} = \ln[a/\tan\beta]$), que integra
 el área aportante acumulada aguas arriba y la pendiente local como \emph{proxy} de la
 predisposición de las laderas a la saturación del suelo, fue evaluado como predictor
-adicional del modelo NHPP pero resultó estadísticamente no significativo ---el intervalo
-de credibilidad al 95\,\% incluía el cero--- y fue excluido del modelo final. Cuatro
-factores explican este resultado en el contexto del Valle de Aburrá. En primer lugar,
+adicional del modelo NHPP pero resultó estadísticamente no significativo y fue excluido del modelo final. 
+Cuatro factores pueden explicar este resultado en el contexto del Valle de Aburrá. En primer lugar,
 a resoluciones de \SI{2}{m}, el cálculo del área aportante es altamente sensible a las
 microirregularidades del MDE LiDAR y a los algoritmos de dirección de flujo: en laderas
-empinadas y de extensión lateral reducida ---dominantes en Medellín--- las
+empinadas y de extensión lateral reducida, dominantes en Medellín, las
 cuencas de contribución se reducen a pocos píxeles y la variabilidad numérica del TWI
 queda dominada por el ruido topográfico del raster más que por la señal hidrológica real.
 En segundo lugar, Medellín es un territorio altamente urbanizado cuya red de
@@ -603,13 +645,13 @@ drenaje ha sido profundamente modificada: alcantarillados, cunetas, canalizacion
 de urbanización interceptan y desvían los flujos superficiales de sus trayectorias
 topográficas naturales, invalidando el supuesto fundamental del TWI de que el flujo de agua
 sigue el gradiente topográfico. En tercer lugar, los movimientos en masa del inventario
-corresponden predominantemente a deslizamientos superficiales y flujos de detritos activados
-por lluvias intensas de corto período de retorno, procesos en los que la inestabilidad es
-controlada primariamente por la inclinación de la ladera y la resistencia al corte
-superficial, no por la acumulación de flujo lateral en cuencas de contribución extensas;
-en este tipo de procesos, el TWI no constituye un predictor físicamente relevante a escala
-de ladera. Finalmente, la colinealidad estructural entre el TWI y la pendiente ---componente
-del denominador de la fórmula--- produce inflación de los intervalos de credibilidad de
+corresponden predominantemente a deslizamientos superficiales y flujos de detritos detonados
+por lluvias intensas, procesos en los que la inestabilidad es
+controlada primariamente por la infiltración vertical, no por la acumulación de flujo lateral 
+en cuencas de contribución extensas;
+en este tipo de procesos, los resultados señalan que el TWI no constituye un predictor físicamente relevante a escala
+de ladera. Finalmente, la colinealidad estructural entre el TWI y la pendiente, componente
+del denominador de la fórmula, produce inflación de los intervalos de credibilidad de
 ambos coeficientes cuando se incluyen simultáneamente, haciendo que el TWI resulte
 indistinguible de cero condicionado en la pendiente ya incorporada al modelo.
 
@@ -631,20 +673,12 @@ la topografía, la impermeabilización de suelos y las obras de estabilización 
 urbanas reducen la susceptibilidad residual respecto a laderas rurales.
 
 El AUC de $0{,}762$ es superior al reportado por \citet{lombardo2019}
-para modelos de proceso puntual con predictores exclusivamente topográficos en
+para modelos de proceso puntual en
 Sicilia (AUC $\approx 0{,}63$--$0{,}67$). Esto es notable considerando que el
 modelo NHPP es parsimonioso: basa toda su discriminación en cuatro predictores
 fijos, sin componentes no paramétricas adicionales. El resultado sugiere que,
 para Medellín, la variabilidad topográfica y litológica explica una
 fracción sustancial de la distribución espacial de la amenaza.
-
-La principal limitación del desempeño discriminativo es la ausencia de variables
-que controlan la susceptibilidad a escala local: heterogeneidad del regolito,
-cobertura vegetal detallada, historia de uso del suelo y proximidad a
-infraestructura. En Medellín, los sectores con alta intervención
-antrópica en ladera presentan densidades de deslizamiento muy superiores a las
-que predicen las covariables topográficas; esta varianza espacial residual no
-está capturada por el modelo NHPP.
 
 El AUC se evalúa a una escala de \SI{500}{m} (celda hexagonal), que es la
 escala de información del modelo. A escalas más gruesas (cuadrantes de 1 km$^2$)
@@ -653,15 +687,10 @@ individual sería menor por la estocasticidad intrínseca del proceso. La compar
 adecuada con otros enfoques (regresión logística, modelos de aprendizaje automático)
 requeriría la misma escala de evaluación y el mismo dominio de integración.
 
-Los resultados de este estudio sugieren varias líneas de extensión prioritarias. La extensión espacio-temporal del proceso puntual con intensidad $\lambda(\mathbf{s},t)$
-\citep{lombardo2020} es posible dado que el inventario incluye fechas de
-ocurrencia. La incorporación de datos de precipitación (acumulados de 1, 3 y
-15 días antes de cada evento) como covariables temporales permitiría descomponer
-la intensidad en una componente espacialmente estacionaria de susceptibilidad y
-una componente temporal de amenaza dinámica. Una ventaja metodológica central de este estudio es el uso de un inventario
+Una ventaja metodológica central de este estudio es el uso de un inventario
 basado exclusivamente en percepción remota, construido mediante interpretación
 sistemática de imágenes de satélite de alta resolución. Los inventarios históricos
-institucionales están sujetos a sesgo de detección: registran preferentemente
+están sujetos a sesgo de detección: registran preferentemente
 eventos con víctimas o daños materiales reportados, eventos cercanos a la
 infraestructura urbana, o eventos que reciben cobertura mediática
 \citep{guzzetti2012}. Esta selectividad induce patrones espaciales sesgados
@@ -681,11 +710,8 @@ para este tipo de inventario: la verosimilitud del NHPP integra la intensidad
 sobre todo el dominio sin requerir ausencias explícitas, lo que reduce la
 sensibilidad al sesgo de detección uniforme. 
 
-La incorporación de variables de intervención antrópica (densidad de cortes de
-talud, distancia a vías, distancia a rellenos) y de propiedades del suelo
-(profundidad del regolito, índice de plasticidad) mejoraría la capacidad del
-modelo para capturar el control local de la susceptibilidad y reduciría la
-varianza estocástica no explicada por los predictores topográficos actuales.
+El uso de inventarios históricos en este tipo de análisis exige la incorporación de variables de intervención antrópica (densidad de cortes de
+talud, distancia a vías, distancia a rellenos) para capturar el control local del componente antrópico en la susceptibilidad. Sin embargo, el alcance del actual trabajo se enfoca en la susceptibilidad asociada a las condiciones naturales del territorio.
 
 % ─────────────────────────────────────────────────────────────
 \section{Conclusiones}
@@ -700,7 +726,7 @@ $\hat{\beta}_{\text{pendiente}} = 0{,}901$ ($e^{0{,}901} \approx 2{,}5\times$)
 es el predictor más influyente del modelo, coherente con el papel mecánico fundamental
 de la pendiente en el mecanismo del talud infinito. El aspecto muestra un efecto
 negativo significativo ($\hat{\beta}_{\text{aspecto}} = -0{,}243$), indicando mayor
-susceptibilidad en laderas de orientación norte donde la menor insolación favorece
+susceptibilidad en laderas de orientación con una direccion azimutal mayor, donde probablemente la menor insolación favorece
 la retención de humedad del suelo. El índice topográfico de humedad (TWI), evaluado
 como predictor adicional, resultó estadísticamente no significativo y fue excluido
 del modelo final, debido a la colinealidad con la pendiente, al ruido numérico que
@@ -731,7 +757,7 @@ la amenaza por movimientos en masa.
 \section*{Disponibilidad de datos}
 % ─────────────────────────────────────────────────────────────
 
-Los datos y codigos utilizados en este trabajo están disponbles en Github (https://github.com/edier-rivera/NHPP-movimientos-masa-VdeA)
+Los datos y codigos utilizados en este trabajo están disponbles en Github (https://github.com/edieraristizabal/NHPP)
 
 % ─────────────────────────────────────────────────────────────
 \bibliographystyle{abbrvnat}
